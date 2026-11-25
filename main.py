@@ -1,45 +1,64 @@
 #!/usr/bin/env python3
-"""Repo entrypoint TEMPLATE for a news-image edition (stdlib-only).
+"""THE WORLD — Tuesday, 24 November 2026 (news-image-20261124 V2):
+33 single-day stories, winner-formula V2.
 
-Copy this file into the edition repo as main.py, next to the rendered
-entry.png, then set EXPECTED_SHA256 to the sha256 of entry.png:
+Entrypoint for this news-image edition. The picture itself (entry.png)
+was rendered beforehand; this script only places a verified copy of it
+where the grader expects it. It reads entry.png from this repository,
+copies it into the directory named by MAKEFUN_OUTPUT_DIR, and checks
+that the copy's sha256 matches the hash recorded below.
 
-    sha256sum entry.png
-
-The renderer (draw.py, PIL) lives OUTSIDE the repo — the entrypoint only
-copies the finished PNG to MAKEFUN_OUTPUT_DIR and verifies it, exactly
-like our 20261124 entry (13 pass / 0 fail). Deterministic: two runs
-write byte-identical output.
+The run is deterministic: running it twice writes byte-identical output.
+Standard library only.
 """
+
+from __future__ import annotations
+
 import hashlib
 import os
 import shutil
+import sys
 from pathlib import Path
+from typing import NoReturn
 
-HERE = Path(__file__).resolve().parent
-SOURCE = HERE / "entry.png"
-MAX_BYTES = 1_048_576
-# TODO: fill in after rendering — sha256sum entry.png
+# sha256 of entry.png in this repository (checked with `sha256sum entry.png`).
 EXPECTED_SHA256 = "38c6c9ceb53918dff7c525b7856dd4e2a7080b4b50b3c15382e9c8c8eb5d9532"
+# Largest image this entrypoint accepts (1 MiB).
+MAX_BYTES = 1_048_576
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
-def main():
-    out_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
-    out_dir.mkdir(parents=True, exist_ok=True)
-    data = SOURCE.read_bytes()
+def fail(message: str) -> NoReturn:
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def main() -> int:
+    repo_dir = Path(__file__).resolve().parent
+    source = repo_dir / "entry.png"
+    output_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        data = source.read_bytes()
+    except OSError as exc:
+        fail(f"cannot read {source}: {exc}")
+
     if len(data) > MAX_BYTES:
-        raise SystemExit(f"entry.png too large: {len(data)} bytes")
+        fail(f"entry.png too large: {len(data)} bytes (limit {MAX_BYTES})")
+    if not data.startswith(PNG_MAGIC):
+        fail("entry.png is not a PNG file")
     digest = hashlib.sha256(data).hexdigest()
     if digest != EXPECTED_SHA256:
-        raise SystemExit(f"entry.png sha256 mismatch: {digest}")
-    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise SystemExit("entry.png is not a PNG file")
-    dest = out_dir / "entry.png"
-    shutil.copyfile(SOURCE, dest)
-    if dest.read_bytes() != data:
-        raise SystemExit("written copy differs from source")
+        fail(f"entry.png sha256 mismatch: got {digest}, expected {EXPECTED_SHA256}")
+
+    dest = output_dir / "entry.png"
+    shutil.copyfile(source, dest)
+    if hashlib.sha256(dest.read_bytes()).hexdigest() != EXPECTED_SHA256:
+        fail("copied file does not match the expected sha256")
     print(f"wrote {dest} ({len(data)} bytes)")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
