@@ -37,7 +37,10 @@ def main() -> int:
     repo_dir = Path(__file__).resolve().parent
     source = repo_dir / "entry.png"
     output_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except OSError as exc:
+        fail(f"cannot create output directory {output_dir}: {exc}")
 
     try:
         data = source.read_bytes()
